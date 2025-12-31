@@ -1,10 +1,11 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
-import { UserSignupDto } from './user.dto';
+import { UserSignupDto } from './dto/user-request.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from './user.entity';
 import { Like, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class UserService {
@@ -53,25 +54,37 @@ export class UserService {
   async findAllUsers() {
     return this.userRepo.find({});
   }
-  
-  async findUserByEmail(email: string): Promise<UserEntity> {
-    await this.userRepo.findOne({
+
+  async findUserByEmail(email: string): Promise<UserEntity | null> {
+    return this.userRepo.findOne({
       where: {
-        email: email.toLowerCase(),
+        email,
       },
     });
   }
 
-  async findUserByProperty(data: FindUserDto) {
-    const { email, first_name, last_name, name } = data;
-    const user = await this.userRepo.find({
-      where: [
-        { email: Like(`%${email}%`) },
-        { first_name: Like(`%${first_name}%`) },
-        { last_name: Like(`%${last_name}%`) },
-        { name: Like(`%${name}%`) },
-      ],
-    });
-    return user;
+  async updateRefreshTokenByEmail(email: string, refToken: string) {
+    if (!refToken) {
+      const user = await this.findOneByEmail(email.toLowerCase());
+      const saveEntity = { ...user, refresh_token: null };
+      return await this.userRepo.save(saveEntity);
+    }
+    const hashedToken = await this.hashData(refToken);
+    const user = await this.findOneByEmail(email.toLowerCase());
+    const saveEntity = { ...user, refresh_token: hashedToken };
+    return await this.userRepo.save(saveEntity);
   }
+
+  // async findUserByProperty(data: FindUserDto) {
+  //   const { email, first_name, last_name, name } = data;
+  //   const user = await this.userRepo.find({
+  //     where: [
+  //       { email: Like(`%${email}%`) },
+  //       { first_name: Like(`%${first_name}%`) },
+  //       { last_name: Like(`%${last_name}%`) },
+  //       { name: Like(`%${name}%`) },
+  //     ],
+  //   });
+  //   return user;
+  // }
 }
